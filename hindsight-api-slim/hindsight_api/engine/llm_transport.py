@@ -1,7 +1,8 @@
 """Transport-level concerns shared by the SDK-backed LLM providers.
 
-The OpenAI and Anthropic SDKs both sit on ``httpx``, and both hide the same two
-things from an operator staring at a stalled call:
+The OpenAI and Anthropic SDKs both sit on ``httpx`` (anthropic 1.x on its fork,
+``httpx2``), and both hide the same two things from an operator staring at a
+stalled call:
 
 * **Which phase stalled.** A bare float timeout means "all four httpx phases", and
   ``APITimeoutError`` stringifies to ``"Request timed out."`` whether the request
@@ -25,8 +26,8 @@ from typing import TypeVar
 
 import aiohttp
 
-# Only to configure the third-party SDKs built on httpx (openai, anthropic); our own
-# HTTP calls go through aiohttp.
+# Only to configure the third-party SDKs built on httpx (openai, and anthropic before
+# 1.x); our own HTTP calls go through aiohttp.
 import httpx  # noqa: TID251
 
 from ..config import (
@@ -49,7 +50,7 @@ _TimeoutT = TypeVar("_TimeoutT")
 
 
 def build_sdk_timeout(total: float, timeout_cls: type[_TimeoutT] = httpx.Timeout) -> _TimeoutT:
-    """Per-phase httpx timeout for an SDK client, with the connect phase capped.
+    """Per-phase timeout for an SDK client, with the connect phase capped.
 
     ``total`` is the resolved per-request LLM timeout and stays in force for the
     read, write and pool phases. Connect is capped at ``HINDSIGHT_API_LLM_CONNECT_TIMEOUT``
