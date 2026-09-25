@@ -21,6 +21,7 @@ exactly ``llm_timeout`` and the logs could not say which phase was stuck.
 from __future__ import annotations
 
 import logging
+from typing import TypeVar
 
 import aiohttp
 
@@ -44,8 +45,10 @@ _MESSAGE_CAP = 200
 # Returned when an error wraps no transport-level cause.
 _NO_CAUSE = "<no cause>"
 
+_TimeoutT = TypeVar("_TimeoutT")
 
-def build_sdk_timeout(total: float) -> httpx.Timeout:
+
+def build_sdk_timeout(total: float, timeout_cls: type[_TimeoutT] = httpx.Timeout) -> _TimeoutT:
     """Per-phase httpx timeout for an SDK client, with the connect phase capped.
 
     ``total`` is the resolved per-request LLM timeout and stays in force for the
@@ -53,11 +56,15 @@ def build_sdk_timeout(total: float) -> httpx.Timeout:
     (10 s by default) so an unreachable or wedged endpoint surfaces in seconds
     rather than consuming the whole request budget. Setting that variable to 0
     restores the old behaviour of one value across all four phases.
+
+    ``timeout_cls`` is the ``Timeout`` class the SDK itself exports. anthropic 1.x
+    is built on ``httpx2`` rather than ``httpx`` and does not accept an
+    ``httpx.Timeout`` (#4683), so that client passes ``anthropic.Timeout``.
     """
     connect_cap = get_config().llm_connect_timeout
     if connect_cap <= 0:
-        return httpx.Timeout(total)
-    return httpx.Timeout(total, connect=min(connect_cap, total))
+        return timeout_cls(total)
+    return timeout_cls(total, connect=min(connect_cap, total))
 
 
 def build_aiohttp_timeout(total: float) -> aiohttp.ClientTimeout:
