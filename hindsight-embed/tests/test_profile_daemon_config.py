@@ -993,3 +993,25 @@ def test_configure_from_env_persists_every_api_var(temp_home, monkeypatch):
     assert "HINDSIGHT_API_LLM_BASE_URL=https://maas-api.example.com/v1" in active
     assert "HINDSIGHT_API_EMBEDDINGS_PROVIDER=tei" in active
     assert not any(line.startswith("HINDSIGHT_EMBED_API_URL=") for line in active)
+
+
+def test_load_profile_config_strips_surrounding_dotenv_quotes(temp_home):
+    """Conventional dotenv quoting must not leak quote characters into values (#5301)."""
+    from hindsight_embed.profile_manager import ProfileManager
+
+    pm = ProfileManager()
+    pm.create_profile("quoted", 9100, {})
+    pm.resolve_profile_paths("quoted").config.write_text(
+        'HINDSIGHT_API_LLM_API_KEY="test-key"\n'
+        "HINDSIGHT_API_LLM_MODEL='gpt-4.1-mini'\n"
+        "HINDSIGHT_API_PORT=9100\n"
+        "HINDSIGHT_API_LLM_PROVIDER=openai\n",
+        encoding="utf-8",
+    )
+
+    config = pm.load_profile_config("quoted")
+
+    assert config["HINDSIGHT_API_LLM_API_KEY"] == "test-key"
+    assert config["HINDSIGHT_API_LLM_MODEL"] == "gpt-4.1-mini"
+    assert config["HINDSIGHT_API_PORT"] == "9100"
+    assert config["HINDSIGHT_API_LLM_PROVIDER"] == "openai"

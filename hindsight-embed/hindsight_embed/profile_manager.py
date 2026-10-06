@@ -620,7 +620,11 @@ class ProfileManager:
                 # Parse KEY=VALUE
                 if "=" in line:
                     key, value = line.split("=", 1)
-                    config[key.strip()] = value.strip()
+                    value = value.strip()
+                    # Strip one matching pair of surrounding quotes (dotenv style)
+                    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                        value = value[1:-1]
+                    config[key.strip()] = value
 
         return config
 
