@@ -1514,9 +1514,12 @@ def _migrate_one_schema_pg(
     caller can attribute the failure back to this schema.
     """
     run_migrations(database_url, schema=schema, migration_database_url=migration_database_url)
+    # The post-migration helpers open sync libpq engines like run_migrations does, so they
+    # need the same DDL-capable URL rather than the application URL.
+    ddl_url = migration_database_url or database_url
     if embedding_dimension is not None:
         ensure_embedding_dimension(
-            database_url,
+            ddl_url,
             embedding_dimension,
             schema=schema,
             vector_extension=vector_extension,
@@ -1524,13 +1527,13 @@ def _migrate_one_schema_pg(
         )
     if ensure_extensions:
         ensure_vector_extension(
-            database_url,
+            ddl_url,
             vector_extension=vector_extension,
             schema=schema,
             store_owned_memories=store_owned_memories,
         )
         ensure_text_search_extension(
-            database_url,
+            ddl_url,
             text_search_extension=text_search_extension,
             schema=schema,
             pg_search_tokenizer=pg_search_tokenizer,

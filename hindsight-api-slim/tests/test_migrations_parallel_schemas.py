@@ -190,3 +190,32 @@ def test_worker_is_picklable():
     import pickle
 
     pickle.loads(pickle.dumps(migrations._migrate_one_schema_pg))
+
+
+def test_post_migration_steps_use_migration_database_url(monkeypatch):
+    """With a separate migration URL, the post-migration DDL helpers must receive it too.
+
+    The application URL may carry driver-specific query args (e.g. asyncpg server
+    settings) that the sync libpq engines these helpers open cannot parse.
+    """
+    monkeypatch.setattr(migrations, "_should_isolate_migrations", lambda: False)
+    seen: dict[str, str] = {}
+
+    def make(step):
+        def _step(database_url, *args, **kwargs):
+            seen[step] = database_url
+
+        return _step
+
+    monkeypatch.setattr(migrations, "run_migrations", make("run_migrations"))
+    monkeypatch.setattr(migrations, "ensure_embedding_dimension", make("embedding_dimension"))
+    monkeypatch.setattr(migrations, "ensure_vector_extension", make("vector_extension"))
+    monkeypatch.setattr(migrations, "ensure_text_search_extension", make("text_search_extension"))
+
+    app_url = "postgresql://app:x@db/mem?max_parallel_maintenance_workers=0"
+    mig_url = "postgresql://app:x@db/mem"
+    migrations.run_migrations_for_schemas(app_url, ["a"], migration_database_url=mig_url, embedding_dimension=384)
+
+    assert seen["embedding_dimension"] == mig_url
+    assert seen["vector_extension"] == mig_url
+    assert seen["text_search_extension"] == mig_url
