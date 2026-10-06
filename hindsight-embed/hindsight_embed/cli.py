@@ -87,7 +87,7 @@ def load_config_file():
     IMPORTANT: Only loads from the active profile, never from default if a specific profile is set.
     Uses dynamic path resolution to support testing with temporary HOME directories.
     """
-    from .profile_manager import ProfileManager, resolve_active_profile
+    from .profile_manager import ProfileManager, resolve_active_profile, unquote_env_value
 
     # Resolve which profile to use (respects --profile flag, env vars, active_profile file)
     active_profile = resolve_active_profile()
@@ -108,8 +108,9 @@ def load_config_file():
                     if line.startswith("export "):
                         line = line[7:]
                     key, value = line.split("=", 1)
+                    key = key.strip()
                     if key not in os.environ:  # Don't override env vars
-                        os.environ[key] = value
+                        os.environ[key] = unquote_env_value(value)
 
 
 ENV_LLM_PROVIDER = "HINDSIGHT_API_LLM_PROVIDER"

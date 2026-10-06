@@ -1015,3 +1015,60 @@ def test_load_profile_config_strips_surrounding_dotenv_quotes(temp_home):
     assert config["HINDSIGHT_API_LLM_MODEL"] == "gpt-4.1-mini"
     assert config["HINDSIGHT_API_PORT"] == "9100"
     assert config["HINDSIGHT_API_LLM_PROVIDER"] == "openai"
+
+
+def test_quoted_port_resolves_consistently(temp_home):
+    """A quoted HINDSIGHT_API_PORT must not be dropped by the port resolver (#5301)."""
+    from hindsight_embed.profile_manager import ProfileManager
+
+    pm = ProfileManager()
+    pm.create_profile("quotedport", 9100, {})
+    pm.resolve_profile_paths("quotedport").config.write_text(
+        "HINDSIGHT_API_PORT=\"9234\"\nHINDSIGHT_EMBED_CP_PORT='9235'\n",
+        encoding="utf-8",
+    )
+
+    paths = pm.resolve_profile_paths("quotedport")
+
+    assert paths.port == 9234
+    assert paths.ui_port == 9235
+    assert pm.load_profile_config("quotedport")["HINDSIGHT_API_PORT"] == "9234"
+
+
+def test_unquote_env_value_edge_cases():
+    from hindsight_embed.profile_manager import unquote_env_value
+
+    assert unquote_env_value('  "a b"  ') == "a b"
+    assert unquote_env_value("'a'") == "a"
+    assert unquote_env_value("plain") == "plain"
+    assert unquote_env_value("\"a'") == "\"a'"
+    assert unquote_env_value('""') == ""
+    assert unquote_env_value('"') == '"'
+
+
+def test_load_config_file_and_raw_env_strip_quotes(temp_home, monkeypatch):
+    """The CLI env loader and the control center reader must unquote values (#5301)."""
+    import os
+
+    from hindsight_embed.cli import load_config_file, set_cli_profile_override
+    from hindsight_embed.control_center.service import _read_raw_env
+
+    set_cli_profile_override(None)
+    monkeypatch.delenv("HINDSIGHT_EMBED_PROFILE", raising=False)
+    monkeypatch.delenv("HINDSIGHT_API_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("HINDSIGHT_API_LLM_MODEL", raising=False)
+
+    config_path = temp_home / ".hindsight" / "embed"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "HINDSIGHT_API_LLM_API_KEY=\"test-key\"\nexport HINDSIGHT_API_LLM_MODEL='gpt-4.1-mini'\n",
+        encoding="utf-8",
+    )
+
+    load_config_file()
+    assert os.environ["HINDSIGHT_API_LLM_API_KEY"] == "test-key"
+    assert os.environ["HINDSIGHT_API_LLM_MODEL"] == "gpt-4.1-mini"
+
+    raw = _read_raw_env("")
+    assert raw["HINDSIGHT_API_LLM_API_KEY"] == "test-key"
+    assert raw["HINDSIGHT_API_LLM_MODEL"] == "gpt-4.1-mini"

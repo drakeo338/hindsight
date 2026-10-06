@@ -260,6 +260,14 @@ class ProfileMetadata:
     profiles: dict[str, dict] = field(default_factory=dict)
 
 
+def unquote_env_value(value: str) -> str:
+    """Strip whitespace, then one matching pair of surrounding quotes (dotenv style)."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
 class ProfileManager:
     """Manages configuration profiles for hindsight-embed."""
 
@@ -555,7 +563,7 @@ class ProfileManager:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, value = line.split("=", 1)
-            key, value = key.strip(), value.strip()
+            key, value = key.strip(), unquote_env_value(value)
             try:
                 if key == ENV_API_PORT:
                     ov.api = int(value)
@@ -620,11 +628,7 @@ class ProfileManager:
                 # Parse KEY=VALUE
                 if "=" in line:
                     key, value = line.split("=", 1)
-                    value = value.strip()
-                    # Strip one matching pair of surrounding quotes (dotenv style)
-                    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                        value = value[1:-1]
-                    config[key.strip()] = value
+                    config[key.strip()] = unquote_env_value(value)
 
         return config
 

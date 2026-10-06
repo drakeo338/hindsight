@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass
 
 from .. import daemon_client
 from .._http_probe import ProbeResponse, probe_get
-from ..profile_manager import ENV_API_PORT, ENV_CP_PORT, ProfileManager
+from ..profile_manager import ENV_API_PORT, ENV_CP_PORT, ProfileManager, unquote_env_value
 
 # Env var names the wizard owns. Writing config replaces these; everything else
 # in the profile (idle timeout, bank id, custom keys) is preserved untouched.
@@ -173,7 +173,7 @@ def _read_raw_env(name: str) -> dict[str, str]:
         if "=" not in line:
             continue
         key, value = line.split("=", 1)
-        env[key.strip()] = value.strip()
+        env[key.strip()] = unquote_env_value(value)
     return env
 
 
